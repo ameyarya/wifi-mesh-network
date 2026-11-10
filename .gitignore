@@ -1,0 +1,26 @@
+# Private: your floor plan, photos and layout stay on your machine
+sim/apartment/floorplan.png
+sim/apartment/tex_*.png
+sim/apartment/photos/
+sim/apartment/*.heic
+sim/apartment/*.HEIC
+sim/apartment/*.jpg
+sim/apartment/*.jpeg
+sim/apartment/apartment.json
+sim/apartment/apartment.xml
+sim/apartment/apartment_assets.xml
+sim/apartment/furniture*.json
+sim/apartment/wifi.json
+sim/apartment/history/
+sim/apartment/*.json.tmp
+sim/.scene.xml
+sim/out/
+sim/.venv/
+# Editor runs against the example layout too: don't commit its edits or history
+examples/apartment/history/
+examples/apartment/*.json.tmp
+# Generic
+__pycache__/
+.venv/
+.DS_Store
+*.pyc

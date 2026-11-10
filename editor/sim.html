@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sim Apartment</title>
+<style>
+:root{color-scheme:dark;--bg:#0b0f15;--panel:#121822;--panel2:#1b2330;--line:#263142;--line2:#35445b;--fg:#eef3fa;--dim:#9aabc2;--dim2:#7d8ea8;
+  --accent:#60a5fa;--sel:#f59e0b;--ok:#4ade80;--warn:#fbbf24;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--fg)}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);height:100vh;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:12px;padding:12px 18px;flex:none;flex-wrap:wrap}
+header h1{font-size:20px;margin:0;font-weight:650}.sub{font-size:12px;color:var(--dim2)}
+.sp{flex:1}
+a.linkbtn,button{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:7px 12px;cursor:pointer;text-decoration:none;font-size:13px}
+button:hover{background:#243045}button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:#1d4ed8;border-color:#3b82f6}button.on{background:var(--accent);color:#06101f;border-color:#93c5fd}
+main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;padding:0 18px 14px}
+#stage{position:relative;background:#05070a;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+#plan,#three{position:absolute;inset:0;width:100%;height:100%}
+#three{display:none}
+aside{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;overflow:auto;display:flex;flex-direction:column;gap:14px}
+h2{font-size:11px;font-weight:650;letter-spacing:.8px;text-transform:uppercase;color:var(--dim2);margin:0}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dim2)}
+input,select{font:inherit;color:inherit;background:#0d131c;border:1px solid var(--line2);border-radius:8px;padding:6px;min-width:0;width:100%}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hint{font-size:12px;line-height:1.55;color:var(--dim);margin:0}
+#status{font-size:12px;color:var(--dim);min-height:18px}#status.warn{color:var(--warn)}#status.ok{color:var(--ok)}
+.item{cursor:move;transition:opacity .12s}.item:hover{opacity:.85}.item.sel{stroke:var(--sel);stroke-width:3}
+.lbl{pointer-events:none;paint-order:stroke;stroke:#0b0f15;stroke-width:3px;stroke-linejoin:round;font-weight:600}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin:0 3px 0 8px;vertical-align:-1px}.sw:first-child{margin-left:0}
+.btns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.btns.three{grid-template-columns:repeat(3,1fr)}
+.btns button{padding:7px 4px;text-align:center;white-space:nowrap}
+.list div{display:flex;justify-content:space-between;gap:8px}.list div i{font-style:normal;color:var(--dim2);font-size:11px}
+details.help summary{cursor:pointer;font-size:12px;color:var(--dim2);padding:2px 0}details.help p{margin-top:8px}
+#stage{background:radial-gradient(circle at 50% 40%,#0e1520,#05070a)}
+.handle{fill:var(--sel);cursor:nwse-resize}
+.list{display:flex;flex-direction:column;gap:2px;flex:1;min-height:120px;overflow:auto;font-size:12px}
+.list div{padding:4px 6px;border-radius:6px;cursor:pointer;color:var(--dim)}.list div.sel{background:var(--panel2);color:var(--fg)}
+@media(max-width:900px){main{grid-template-columns:1fr;grid-template-rows:60vh auto}}
+</style></head><body>
+<header>
+  <h1>Sim apartment</h1><span class="sub">the simulator's copy of home · drag to move, corner to resize</span>
+  <span class="sp"></span>
+  <button id="v2d" class="on">Plan</button><button id="v3d">3D</button>
+  <label style="flex-direction:row;align-items:center;gap:6px;color:var(--dim)"><input type="checkbox" id="showplan" checked style="width:auto">floor plan</label>
+  <label style="flex-direction:row;align-items:center;gap:6px;color:var(--dim)"><input type="checkbox" id="showlinks" checked style="width:auto">Wi-Fi links</label>
+  <button id="undo" title="Undo (Cmd/Ctrl+Z)">Undo</button>
+  <select id="versions" title="Saved versions (a copy is kept at most once a minute)" style="width:auto"><option value="">Versions…</option></select>
+  <span id="saved" class="sub">…</span>
+  <button id="save" class="primary" title="Changes save automatically; this also rebuilds the simulator's apartment">Rebuild sim</button>
+</header>
+<main>
+  <div id="stage"><svg id="plan"></svg><canvas id="three"></canvas></div>
+  <aside>
+    <div><h2>Selected</h2></div>
+    <div id="none" class="hint card">Click a piece of furniture to edit it; double-click it (or its name in the list) to rename it. Walls come from the floor plan.</div>
+    <div id="edit" class="card" hidden>
+      <div class="grid2">
+        <label>Name<input id="f-name"></label>
+        <label>Height (m)<input id="f-h" type="number" step="0.05" min="0.02" max="2.5"></label>
+        <label>x (m, centre)<input id="f-x" type="number" step="0.05"></label>
+        <label>y (m, centre)<input id="f-y" type="number" step="0.05"></label>
+        <label id="l-w">Width x (m)<input id="f-w" type="number" step="0.05" min="0.05"></label>
+        <label id="l-d">Depth y (m)<input id="f-d" type="number" step="0.05" min="0.05"></label>
+      </div>
+      <div id="node-opts" class="row" style="margin-top:10px" hidden>
+        <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="n-mm" style="width:auto">mmWave module</label>
+        <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="n-tx" style="width:auto">Transmitter</label>
+        <label id="l-aim" style="width:100%">mmWave aims at (° · 0 = east, 90 = north)<input id="n-aim" type="number" step="5"></label>
+      </div>
+      <div class="row" style="margin-top:10px"><button id="rot">Rotate 90°</button><button id="dup">Duplicate</button><button id="del">Delete</button></div>
+    </div>
+    <div><h2>Add furniture</h2></div>
+    <div class="btns"><button id="add-box">+ Box</button><button id="add-cyl">+ Round</button><button id="add-rug">+ Rug</button><button id="add-door" title="A no-go line across a doorway: the simulated rover can't cross it and steers clear">+ Door</button></div>
+    <div><h2>Wi-Fi sensing</h2></div>
+    <div class="btns three"><button id="add-socket" title="A wall socket (power for a node)">+ Socket</button><button id="add-node" title="An ESP32-S3 board">+ Node</button><button id="add-router" title="Your Wi-Fi router (one)">+ Router</button></div>
+    <div class="card" id="cov-card">
+      <div class="row" style="gap:12px;margin-bottom:8px">
+        <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="cov-mm" checked style="width:auto">mmWave range</label>
+        <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="cov-wifi" checked style="width:auto">Wi-Fi zones</label>
+        <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="cov-blind" checked style="width:auto">Blind spots</label>
+      </div>
+      <div class="grid3">
+        <label title="Seeed wiki: detection distance 0.75–6 m (adjustable)">Moving (m)<input id="r-move" type="number" step="0.5" min="1" max="12"></label>
+        <label title="Seeed doesn't publish a separate still-person range for this module: an assumption, adjust to what you measure">Still (m)<input id="r-still" type="number" step="0.5" min="0.5" max="12"></label>
+        <label title="Seeed wiki: detection angle ±60°">Half-angle (°)<input id="r-ang" type="number" step="5" min="10" max="90"></label>
+      </div>
+      <p class="hint" style="margin-top:8px"><span class="sw" style="background:rgba(34,211,238,.45)"></span>mmWave moving <span class="sw" style="background:rgba(34,211,238,.8)"></span>still <span class="sw" style="background:rgba(251,191,36,.5)"></span>Wi-Fi zone <span class="sw" style="background:rgba(239,68,68,.55)"></span>blind spot</p>
+    </div>
+    <div id="wifi-sum" class="hint card"></div>
+    <div><h2>Items</h2></div>
+    <div class="list" id="list"></div>
+    <details class="help"><summary>How this works</summary><p class="hint">x runs east, y north, from the plan's bottom-left corner. Rugs and the bedroom carpet are flat (the rover drives over them); everything else blocks it. Doors (red dashed) are no-go lines: draw one across a doorway to keep the rover out; it's invisible to the simulated camera, like a robot vacuum's virtual wall. Wi-Fi layer: sockets (yellow), router (purple) and ESP32 nodes (blue) save to <code>sim/apartment/wifi.json</code>; a link runs from each transmitter (the router, or a node ticked Transmitter) to every other node, green / amber / red for 0 / 1 / 2+ walls crossed. Every change saves itself to <code>sim/apartment/furniture.json</code> on this Mac (not the public repo) within a second, with a copy in <code>history/</code> at most once a minute; Rebuild sim makes the simulator use it.</p></details>
+    <div id="status"></div>
+  </aside>
+</main>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+const $ = id => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+let data = null, sel = null, history = [], dirty = false, view = '2d';
+const svg = $('plan');
+
+function status(t, cls = '') { $('status').textContent = t; $('status').className = cls; }
+function items() {
+  return [...data.furniture.boxes.map(o => ({kind: 'box', o})), ...data.furniture.cylinders.map(o => ({kind: 'cyl', o})),
+          ...data.furniture.rugs.map(o => ({kind: 'rug', o})), ...data.furniture.barriers.map(o => ({kind: 'door', o})),
+          ...data.wifi.sockets.map(o => ({kind: 'socket', o})), ...data.wifi.routers.map(o => ({kind: 'router', o})),
+          ...data.wifi.nodes.map(o => ({kind: 'node', o}))];
+}
+const KIND_KEY = {box: 'boxes', cyl: 'cylinders', rug: 'rugs', door: 'barriers'};
+const WIFI_KEY = {socket: 'sockets', router: 'routers', node: 'nodes'};
+const isPt = k => k in WIFI_KEY;
+const coll = k => isPt(k) ? data.wifi[WIFI_KEY[k]] : data.furniture[KIND_KEY[k]];
+const furnCount = () => items().filter(it => !isPt(it.kind)).length;
+function snapshot() { history.push(JSON.stringify({f: data.furniture, w: data.wifi})); if (history.length > 100) history.shift(); dirty = true; changedAt = Date.now(); }
+let changedAt = 0, saving = false;
+async function autosave() {          // a second after the last change, not mid-drag
+  if (!dirty || saving || drag || Date.now() - changedAt < 800) return;
+  saving = true; dirty = false; $('saved').textContent = 'saving…';
+  try {
+    const r = await fetch('/sim/autosave', {method: 'POST', body: JSON.stringify(data.furniture)});
+    const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+    fixNames(j.furniture); await saveWifi();
+    $('saved').textContent = `saved ${j.saved_at}`; $('saved').style.color = ''; loadVersions();
+  } catch (e) { dirty = true; changedAt = Date.now() + 6000; $('saved').textContent = 'not saved: ' + e.message; $('saved').style.color = 'var(--warn)'; }
+  saving = false;
+}
+setInterval(autosave, 400);
+async function saveWifi() {
+  const r = await fetch('/sim/wifi', {method: 'POST', body: JSON.stringify(data.wifi)});
+  const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+  for (const k of Object.values(WIFI_KEY)) data.wifi[k].forEach((o, i) => { if (j[k] && j[k][i]) o.name = j[k][i].name; });
+  list();
+}
+function fixNames(saved) {            // the server makes duplicate names unique; mirror that here
+  for (const k of ['boxes', 'cylinders', 'rugs', 'barriers'])
+    (data.furniture[k] || []).forEach((o, i) => { if (saved[k] && saved[k][i]) o.name = saved[k][i].name; });
+  list();
+}
+async function loadVersions() {
+  try {
+    const v = (await (await fetch('/sim/versions', {cache: 'no-store'})).json()).versions;
+    const fmt = t => `${t.slice(0, 4)}-${t.slice(4, 6)}-${t.slice(6, 8)} ${t.slice(9, 11)}:${t.slice(11, 13)}:${t.slice(13, 15)}`;
+    $('versions').innerHTML = '<option value="">Versions…</option>' + v.map(t => `<option value="${t}">${fmt(t)}</option>`).join('');
+  } catch (e) {}
+}
+$('versions').onchange = async e => {
+  const v = e.target.value; if (!v) return;
+  if (!confirm('Go back to the layout saved at ' + e.target.selectedOptions[0].text + '? (What you have now stays in the versions list.)')) { e.target.value = ''; return; }
+  try {
+    const r = await fetch('/sim/restore', {method: 'POST', body: JSON.stringify({version: v})});
+    const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+    data = j; sel = null; history = []; dirty = false; draw(); status('Restored ' + e.target.selectedOptions[0].text, 'ok'); loadVersions();
+  } catch (err) { status('Not restored: ' + err.message, 'warn'); }
+  e.target.value = '';
+};
+function round(v) { return Math.round(v * 100) / 100; }
+function geom(it) {        // centre, size
+  const o = it.o;
+  if (isPt(it.kind)) return {x: o.x, y: o.y, w: 0.2, d: 0.2};
+  if (it.kind === 'cyl') return {x: o.x, y: o.y, w: 2 * o.r, d: 2 * o.r};
+  return {x: (o.x0 + o.x1) / 2, y: (o.y0 + o.y1) / 2, w: o.x1 - o.x0, d: o.y1 - o.y0};
+}
+function setGeom(it, g) {
+  const o = it.o;
+  if (isPt(it.kind)) { o.x = round(g.x); o.y = round(g.y); return; }
+  if (it.kind === 'cyl') { o.x = round(g.x); o.y = round(g.y); o.r = round(Math.max(0.03, Math.min(g.w, g.d) / 2)); return; }
+  o.x0 = round(g.x - g.w / 2); o.x1 = round(g.x + g.w / 2); o.y0 = round(g.y - g.d / 2); o.y1 = round(g.y + g.d / 2);
+}
+
+// ---- top-down plan (SVG) ----
+let S = 60, OX = 20, OY = 20;   // px per metre, offsets
+function fit() {
+  const r = svg.getBoundingClientRect(), [W, H] = data.size;
+  if (r.width < 80 || r.height < 80) return false;
+  S = Math.min((r.width - 40) / W, (r.height - 40) / H); OX = (r.width - W * S) / 2; OY = (r.height - H * S) / 2;
+  return true;
+}
+const px = (x, y) => [OX + x * S, OY + (data.size[1] - y) * S];
+const metres = (sx, sy) => [(sx - OX) / S, data.size[1] - (sy - OY) / S];
+let bg = null, fg = null, bgImage = null;
+function layers() {
+  if (bg) return;
+  bg = document.createElementNS(NS, 'g'); fg = document.createElementNS(NS, 'g'); svg.append(bg, fg);
+  bgImage = document.createElementNS(NS, 'image'); bgImage.setAttribute('href', '/sim/floorplan.png'); bgImage.setAttribute('preserveAspectRatio', 'none'); bg.append(bgImage);
+}
+function el(tag, attrs, parent = fg) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; }
+function color(rgb, a = 1) { return `rgba(${rgb.map(v => Math.round(v * 255)).join(',')},${a})`; }
+function draw() {
+  if (!fit()) { panel(); list(); wifiSummary(); return; }   // pane not laid out yet: nothing sensible to draw
+  layers(); fg.replaceChildren();
+  const [W, H] = data.size;
+  const [x0, y0] = px(0, H);
+  if ($('showplan').checked && data.floorplan) {        // one persistent <image>, only moved, so it never reloads or blinks
+    const b = data.floorplan;   // plan image placement: pixel bounds of the apartment in the image
+    for (const [k, v] of Object.entries({x: x0 - b.left * S * b.m_per_px, y: y0 - b.top * S * b.m_per_px,
+      width: b.width * S * b.m_per_px, height: b.height * S * b.m_per_px, opacity: .22, display: ''})) bgImage.setAttribute(k, v);
+  } else bgImage.setAttribute('display', 'none');
+  el('rect', {x: x0, y: y0, width: W * S, height: H * S, fill: 'rgba(168,145,111,.14)', rx: 4});
+  for (let m = 1; m < W; m++) el('line', {x1: x0 + m * S, y1: y0, x2: x0 + m * S, y2: y0 + H * S, stroke: 'rgba(255,255,255,.05)'});
+  for (let m = 1; m < H; m++) el('line', {x1: x0, y1: y0 + m * S, x2: x0 + W * S, y2: y0 + m * S, stroke: 'rgba(255,255,255,.05)'});
+  for (const c of data.furniture.carpet || []) { const [a, b] = px(c.x0, c.y1); el('rect', {x: a, y: b, width: (c.x1 - c.x0) * S, height: (c.y1 - c.y0) * S, fill: 'rgba(185,176,163,.25)'}); }
+  for (const w of data.walls) {
+    const [a, b] = px(w.x0, w.y1);
+    el('rect', {x: a, y: b, width: Math.max(1, (w.x1 - w.x0) * S), height: Math.max(1, (w.y1 - w.y0) * S),
+      fill: w.kind === 'blinds' ? '#f59e0b' : '#cfd6e2', opacity: w.kind === 'blinds' ? .8 : .9});
+  }
+  const links = wifiLinks();
+  lastCov = data.wifi.nodes.length ? coverage(links) : null;
+  if (lastCov && $('cov-blind').checked) el('image', {href: lastCov.url, x: x0, y: y0, width: W * S, height: H * S, preserveAspectRatio: 'none', 'image-rendering': 'pixelated', 'pointer-events': 'none'});
+  if ($('cov-wifi').checked) for (const l of links) {
+    const [ax, ay] = px(l.a.x, l.a.y), [bx, by] = px(l.b.x, l.b.y);
+    el('line', {x1: ax, y1: ay, x2: bx, y2: by, stroke: 'rgba(251,191,36,.13)', 'stroke-width': bandWidth(l.len) * S, 'pointer-events': 'none'});
+  }
+  if ($('cov-mm').checked) for (const n of data.wifi.nodes) if (n.mmwave) for (const [R, a, k] of [[MM.move, .10, 0], [MM.still, .2, 1]]) {
+    const pts = cone(n, R).map(([x, y]) => px(x, y).join(',')).join(' ');
+    el('polygon', {points: pts, fill: `rgba(34,211,238,${a})`, stroke: k ? 'none' : 'rgba(34,211,238,.45)', 'stroke-width': 1, 'pointer-events': 'none'});
+  }
+  if ($('showlinks').checked) for (const l of links) {
+    const [ax, ay] = px(l.a.x, l.a.y), [bx, by] = px(l.b.x, l.b.y);
+    el('line', {x1: ax, y1: ay, x2: bx, y2: by, stroke: ['#4ade80', '#fbbf24', '#ef4444'][Math.min(2, l.walls)], 'stroke-width': 1.5, 'stroke-dasharray': '5 4', opacity: .85, 'pointer-events': 'none'});
+  }
+  for (const it of items()) {
+    const g = geom(it), isSel = sel && sel.o === it.o;
+    const [cx, cy] = px(g.x, g.y);
+    if (isPt(it.kind)) { drawPoint(it, cx, cy, isSel); continue; }
+    const fill = it.kind === 'door' ? 'rgba(239,68,68,.35)' : color(it.o.rgb || [.6, .6, .6], it.kind === 'rug' ? .45 : .85);
+    const extra = it.kind === 'door' ? {stroke: '#ef4444', 'stroke-width': 2, 'stroke-dasharray': '6 4'} : {};
+    const node = it.kind === 'cyl'
+      ? el('circle', {cx, cy, r: g.w / 2 * S, fill, class: 'item' + (isSel ? ' sel' : '')})
+      : el('rect', {x: cx - g.w / 2 * S, y: cy - g.d / 2 * S, width: Math.max(3, g.w * S), height: Math.max(3, g.d * S), fill, class: 'item' + (isSel ? ' sel' : ''), rx: it.kind === 'rug' ? 8 : 4, ...extra});
+    node.addEventListener('pointerdown', e => startDrag(e, it, 'move'));
+    node.addEventListener('dblclick', e => { e.stopPropagation(); rename(it); });
+    const fits = Math.max(g.w, g.d) * S >= it.o.name.length * 6.2;
+    if (fits || isSel) {
+      const t = el('text', {x: cx, y: it.kind === 'door' ? cy - 6 : cy + 4, 'text-anchor': 'middle', 'font-size': 10.5, fill: it.kind === 'door' ? '#fca5a5' : '#eef3fa', class: 'lbl'});
+      t.textContent = it.o.name;
+    }
+    if (isSel) {
+      const [hx, hy] = px(g.x + g.w / 2, g.y - g.d / 2);
+      el('rect', {x: hx - 6, y: hy - 6, width: 12, height: 12, class: 'handle'}).addEventListener('pointerdown', e => startDrag(e, it, 'size'));
+    }
+  }
+  el('line', {x1: x0 + 10, y1: y0 + H * S - 12, x2: x0 + 10 + S, y2: y0 + H * S - 12, stroke: '#eef3fa', 'stroke-width': 2});
+  el('text', {x: x0 + 14 + S, y: y0 + H * S - 8, fill: '#eef3fa', 'font-size': 11}).textContent = '1 m';
+  panel(); list(); wifiSummary();
+}
+// mmWave: Seeed wiki for this module: detection distance 0.75–6 m (adjustable), ±60°. A still person is detected closer
+// than a moving one and Seeed gives no number for it, so 'still' is an adjustable assumption.
+const MM = {move: 6, still: 3, ang: 60};
+try { Object.assign(MM, JSON.parse(localStorage.getItem('simRanges') || '{}')); } catch (e) {}
+for (const [id, k] of [['r-move', 'move'], ['r-still', 'still'], ['r-ang', 'ang']]) {
+  $(id).value = MM[k];
+  $(id).addEventListener('change', () => { MM[k] = Math.max(0.5, +$(id).value || MM[k]); try { localStorage.setItem('simRanges', JSON.stringify(MM)); } catch (e) {} draw(); });
+}
+function rayHit(ox, oy, dx, dy, max) {   // distance along a ray to the first wall, or max
+  let best = max;
+  for (const w of data.walls) {
+    if (w.kind !== 'wall' || (ox >= w.x0 && ox <= w.x1 && oy >= w.y0 && oy <= w.y1)) continue;
+    let t0 = 0, t1 = best;
+    for (const [o, d, lo, hi] of [[ox, dx, w.x0, w.x1], [oy, dy, w.y0, w.y1]]) {
+      if (Math.abs(d) < 1e-9) { if (o < lo || o > hi) { t0 = Infinity; break; } continue; }
+      let a = (lo - o) / d, b = (hi - o) / d; if (a > b) [a, b] = [b, a];
+      t0 = Math.max(t0, a); t1 = Math.min(t1, b); if (t0 > t1) break;
+    }
+    if (t0 <= t1 && t0 > 0 && t0 < best) best = t0;
+  }
+  return best;
+}
+function defaultAim(n) { return Math.round(Math.atan2(data.size[1] / 2 - n.y, data.size[0] / 2 - n.x) * 180 / Math.PI / 5) * 5; }
+function cone(n, R) {                    // the sensor's field of view out to R metres, stopped by walls
+  const aim = n.aim ?? defaultAim(n), pts = [[n.x, n.y]];
+  for (let a = -MM.ang; a <= MM.ang + 1e-6; a += 2) {
+    const r = (aim + a) * Math.PI / 180, dx = Math.cos(r), dy = Math.sin(r), t = rayHit(n.x, n.y, dx, dy, R);
+    pts.push([n.x + dx * t, n.y + dy * t]);
+  }
+  return pts;
+}
+function bandWidth(len) { return Math.max(0.6, 2 * Math.sqrt(0.125 * len / 4)); }   // first Fresnel zone at 2.4 GHz, at the link's middle
+function coverage(links) {               // 10 cm grid: how much floor each kind of sensing reaches
+  const [W, H] = data.size, res = 0.1, w = Math.ceil(W / res), h = Math.ceil(H / res);
+  const layer = () => { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d', {willReadFrequently: true}); g.setTransform(1 / res, 0, 0, -1 / res, 0, h); g.fillStyle = g.strokeStyle = '#fff'; return g; };
+  const wall = layer(), move = layer(), still = layer(), wifi = layer();
+  for (const x of data.walls) if (x.kind === 'wall') wall.fillRect(x.x0, x.y0, x.x1 - x.x0, x.y1 - x.y0);
+  for (const n of data.wifi.nodes) if (n.mmwave) for (const [g, R] of [[move, MM.move], [still, MM.still]]) {
+    g.beginPath(); cone(n, R).forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.fill();
+  }
+  for (const l of links) { wifi.lineWidth = bandWidth(l.len); wifi.beginPath(); wifi.moveTo(l.a.x, l.a.y); wifi.lineTo(l.b.x, l.b.y); wifi.stroke(); }
+  const px_ = g => g.getImageData(0, 0, w, h).data, wd = px_(wall), mv = px_(move), st = px_(still), wf = px_(wifi);
+  const out = document.createElement('canvas'); out.width = w; out.height = h;
+  const og = out.getContext('2d'), img = og.createImageData(w, h);
+  let floor = 0, nMove = 0, nStill = 0, nWifi = 0, nAny = 0;
+  for (let i = 0; i < w * h; i++) {
+    if (wd[i * 4 + 3] > 127) continue;
+    floor++; const m = mv[i * 4 + 3] > 127, s = st[i * 4 + 3] > 127, f = wf[i * 4 + 3] > 127;
+    if (m) nMove++; if (s) nStill++; if (f) nWifi++;
+    if (m || f) nAny++; else { img.data[i * 4] = 239; img.data[i * 4 + 1] = 68; img.data[i * 4 + 2] = 68; img.data[i * 4 + 3] = 70; }
+  }
+  og.putImageData(img, 0, 0);
+  const pct = n => floor ? Math.round(100 * n / floor) : 0;
+  return {url: out.toDataURL(), move: pct(nMove), still: pct(nStill), wifi: pct(nWifi), any: pct(nAny), blind: 100 - pct(nAny)};
+}
+function drawPoint(it, cx, cy, isSel) {
+  const cls = 'item' + (isSel ? ' sel' : '');
+  let node, label = '', fg = '#0b0f15';
+  if (it.kind === 'socket') node = el('rect', {x: cx - 6, y: cy - 6, width: 12, height: 12, rx: 3, fill: '#facc15', class: cls});
+  else if (it.kind === 'router') { node = el('circle', {cx, cy, r: 12, fill: '#a855f7', class: cls}); label = 'R'; fg = '#fff'; }
+  else {
+    const near = nearSocket(it.o), bad = !near || near.d > 0.6;
+    node = el('circle', {cx, cy, r: 12, fill: '#3b82f6', stroke: bad && !isSel ? '#f59e0b' : '', 'stroke-width': bad && !isSel ? 3 : '', class: cls});
+    label = it.o.name.replace(/^node_?/i, '').slice(0, 2); fg = '#fff';
+    if (it.o.mmwave) el('circle', {cx, cy, r: 17, fill: 'none', stroke: '#22d3ee', 'stroke-width': 2, 'pointer-events': 'none'});
+    if (it.o.tx) el('text', {x: cx, y: cy - 20, 'text-anchor': 'middle', 'font-size': 10, fill: '#fca5a5', 'pointer-events': 'none'}).textContent = 'TX';
+  }
+  node.addEventListener('pointerdown', e => startDrag(e, it, 'move'));
+  node.addEventListener('dblclick', e => { e.stopPropagation(); rename(it); });
+  if (label) el('text', {x: cx, y: cy + 4, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 700, fill: fg, 'pointer-events': 'none'}).textContent = label;
+  if (isSel && it.kind !== 'node') el('text', {x: cx, y: cy - 12, 'text-anchor': 'middle', 'font-size': 11, fill: '#eef3fa', 'pointer-events': 'none'}).textContent = it.o.name;
+}
+function nearSocket(o) {
+  let best = null;
+  for (const s of data.wifi.sockets) { const d = Math.hypot(s.x - o.x, s.y - o.y); if (!best || d < best.d) best = {s, d}; }
+  return best;
+}
+function wallsCrossed(a, b) {         // how many walls the straight line a→b passes through
+  const L = Math.hypot(b.x - a.x, b.y - a.y), n = Math.max(1, Math.ceil(L / 0.04));
+  let inside = false, count = 0;
+  for (let i = 0; i <= n; i++) {
+    const x = a.x + (b.x - a.x) * i / n, y = a.y + (b.y - a.y) * i / n;
+    const now = data.walls.some(w => w.kind === 'wall' && x >= w.x0 && x <= w.x1 && y >= w.y0 && y <= w.y1);
+    if (now && !inside) count++;
+    inside = now;
+  }
+  return count;
+}
+function wifiLinks() {                // from each transmitter (router, or a node ticked TX) to every other node
+  const tx = [...data.wifi.routers, ...data.wifi.nodes.filter(n => n.tx)], links = [], N = data.wifi.nodes;
+  const add = (t, n) => links.push({a: t, b: n, len: Math.hypot(t.x - n.x, t.y - n.y), walls: wallsCrossed(t, n)});
+  if (tx.length) { for (const t of tx) for (const n of N) if (n !== t) add(t, n); }
+  else for (let i = 0; i < N.length; i++) for (let j = i + 1; j < N.length; j++) add(N[i], N[j]);   // nodes taking turns: every pair
+  return links;
+}
+function wifiSummary() {
+  const html = wifiSummaryHtml(); if ($('wifi-sum').innerHTML !== html) $('wifi-sum').innerHTML = html;
+}
+function wifiSummaryHtml() {
+  const w = data.wifi, links = wifiLinks(), cov = lastCov;
+  const lines = [`<b>${w.nodes.length}</b> ESP32-S3 board${w.nodes.length === 1 ? '' : 's'} · <b>${w.nodes.filter(n => n.mmwave).length}</b> mmWave module${w.nodes.filter(n => n.mmwave).length === 1 ? '' : 's'} · ${w.routers.length} router · ${w.sockets.length} socket${w.sockets.length === 1 ? '' : 's'}`];
+  if (w.nodes.length > 1 && !w.routers.length && !w.nodes.some(n => n.tx)) lines.push('<span style="color:var(--dim2)">No transmitter ticked: showing every node pair, as if the nodes take turns transmitting.</span>');
+  const bare = w.nodes.filter(n => { const s = nearSocket(n); return !s || s.d > 0.6; });
+  if (bare.length) lines.push(`<span style="color:var(--warn)">No socket within 0.6 m: ${bare.map(n => n.name).join(', ')}</span>`);
+  if (links.length) lines.push(`${links.length} link${links.length === 1 ? '' : 's'}:` + links.map(l => `<br>${l.a.name} → ${l.b.name} · ${l.len.toFixed(1)} m · ${l.walls} wall${l.walls === 1 ? '' : 's'}`).join(''));
+  if (cov && (w.nodes.length)) lines.push(`<b>Floor coverage</b>: mmWave moving ${cov.move}% · still ${cov.still}% · Wi-Fi zones ${cov.wifi}%<br><b>${cov.blind}% blind</b> (neither mmWave nor Wi-Fi reaches it)`);
+  return lines.join('<br>');
+}
+let lastCov = null;
+let drag = null;
+function startDrag(e, it, mode) {
+  e.stopPropagation(); e.preventDefault();
+  if (!sel || sel.o !== it.o) { sel = it; draw(); }
+  snapshot();
+  const [mx, my] = metres(e.clientX - svg.getBoundingClientRect().left, e.clientY - svg.getBoundingClientRect().top);
+  drag = {it, mode, start: [mx, my], g: geom(it)};
+  svg.setPointerCapture(e.pointerId);
+}
+let rafDraw = 0;
+function scheduleDraw() { if (!rafDraw) rafDraw = requestAnimationFrame(() => { rafDraw = 0; draw(); }); }
+svg.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const r = svg.getBoundingClientRect(), [mx, my] = metres(e.clientX - r.left, e.clientY - r.top);
+  const dx = mx - drag.start[0], dy = my - drag.start[1], g = {...drag.g};
+  if (drag.mode === 'move') { g.x += dx; g.y += dy; }
+  else { g.w = Math.max(0.05, g.w + dx); g.d = Math.max(0.05, g.d - dy); g.x += dx / 2; g.y += dy / 2;
+         if (drag.it.kind === 'cyl') { g.w = g.d = Math.max(g.w, g.d); } }
+  setGeom(drag.it, g); scheduleDraw();
+});
+svg.addEventListener('pointerup', () => { drag = null; if (rafDraw) { cancelAnimationFrame(rafDraw); rafDraw = 0; draw(); } });
+svg.addEventListener('pointerdown', () => { sel = null; draw(); });
+
+// ---- side panel ----
+function panel() {
+  $('edit').hidden = !sel; $('none').hidden = !!sel;
+  if (!sel) return;
+  const g = geom(sel);
+  $('f-name').value = sel.o.name; $('f-h').value = sel.o.h ?? ''; $('f-h').disabled = sel.kind === 'rug' || sel.kind === 'door';
+  $('f-x').value = round(g.x); $('f-y').value = round(g.y); $('f-w').value = round(g.w); $('f-d').value = round(g.d);
+  $('l-w').firstChild.textContent = sel.kind === 'cyl' ? 'Diameter (m)' : 'Width x (m)';
+  const pt = isPt(sel.kind);
+  $('f-h').parentElement.hidden = pt; $('l-w').hidden = pt; $('l-d').hidden = pt || sel.kind === 'cyl';
+  $('rot').disabled = pt || sel.kind === 'cyl'; $('dup').disabled = sel.kind === 'router';
+  $('node-opts').hidden = sel.kind !== 'node';
+  if (sel.kind === 'node') {
+    $('n-mm').checked = !!sel.o.mmwave; $('n-tx').checked = !!sel.o.tx;
+    $('l-aim').hidden = !sel.o.mmwave; $('n-aim').value = sel.o.aim ?? defaultAim(sel.o);
+  }
+}
+for (const id of ['f-name', 'f-h', 'f-x', 'f-y', 'f-w', 'f-d']) $(id).addEventListener('change', () => {
+  if (!sel) return; snapshot();
+  sel.o.name = $('f-name').value.replace(/[^\w-]/g, '_') || 'item';
+  if (isPt(sel.kind)) { setGeom(sel, {x: +$('f-x').value, y: +$('f-y').value}); draw(); return; }
+  if (sel.kind !== 'rug' && sel.kind !== 'door') sel.o.h = Math.max(0.02, +$('f-h').value || 0.5);
+  const w = Math.max(0.05, +$('f-w').value), d = sel.kind === 'cyl' ? w : Math.max(0.05, +$('f-d').value);
+  setGeom(sel, {x: +$('f-x').value, y: +$('f-y').value, w, d}); draw();
+});
+for (const [id, key] of [['n-mm', 'mmwave'], ['n-tx', 'tx']]) $(id).addEventListener('change', () => {
+  if (!sel || sel.kind !== 'node') return; snapshot(); sel.o[key] = $(id).checked;
+  if (key === 'mmwave' && sel.o.mmwave && sel.o.aim === undefined) sel.o.aim = defaultAim(sel.o);
+  draw();
+});
+$('n-aim').addEventListener('change', () => {
+  if (!sel || sel.kind !== 'node') return; snapshot(); sel.o.aim = ((+$('n-aim').value % 360) + 360) % 360; draw();
+});
+function rename(it) {
+  const name = prompt('Name for this piece', it.o.name);
+  if (name === null) return;
+  const clean = name.trim().replace(/[^\w-]/g, '_').slice(0, 40);
+  if (!clean) return;
+  if (items().some(x => x.o !== it.o && x.o.name === clean)) { status(`"${clean}" is already used by another piece`, 'warn'); return; }
+  snapshot(); it.o.name = clean; sel = it; draw(); status(`Renamed to ${clean}. Save to keep it.`);
+}
+function list() {
+  const sig = items().map(it => it.o.name + it.kind + (sel && sel.o === it.o ? '*' : '') + (it.kind === 'node' ? (nearSocket(it.o) || {d: -1}).d.toFixed(1) : '')).join('|');
+  if (sig === list.sig) return; list.sig = sig;
+  $('list').innerHTML = '';
+  for (const it of items()) {
+    const d = document.createElement('div');
+    const dup = items().filter(x => x.o.name === it.o.name).length > 1;
+    let note = it.kind === 'cyl' ? 'round' : it.kind === 'door' ? 'no-go line' : it.kind;
+    if (dup) note += ' · same name as another';
+    if (it.kind === 'node') {
+      const s = nearSocket(it.o);
+      note += s && s.d <= 0.6 ? ` · ${s.d.toFixed(2)} m from ${s.s.name}` : ' · no socket nearby';
+      if (!s || s.d > 0.6) d.style.color = 'var(--warn)';
+    }
+    d.innerHTML = '<span></span><i></i>'; d.firstChild.textContent = it.o.name; d.lastChild.textContent = note;
+    if (dup) d.style.color = 'var(--warn)';
+    if (sel && sel.o === it.o) d.className = 'sel';
+    d.onclick = () => { sel = it; draw(); }; d.ondblclick = () => rename(it);
+    d.title = 'Double-click to rename'; $('list').appendChild(d);
+  }
+}
+$('rot').onclick = () => { if (!sel || sel.kind === 'cyl') return; snapshot(); const g = geom(sel); setGeom(sel, {...g, w: g.d, d: g.w}); draw(); };
+$('del').onclick = () => {
+  if (!sel) return; snapshot();
+  for (const k of Object.values(KIND_KEY)) data.furniture[k] = data.furniture[k].filter(o => o !== sel.o);
+  for (const k of Object.values(WIFI_KEY)) data.wifi[k] = data.wifi[k].filter(o => o !== sel.o);
+  sel = null; draw();
+};
+$('dup').onclick = () => {
+  if (!sel || sel.kind === 'router') return; snapshot();
+  const o = JSON.parse(JSON.stringify(sel.o)); o.name += '_2';
+  const it = {kind: sel.kind, o}; const g = geom(it); setGeom(it, {...g, x: g.x + 0.3, y: g.y - 0.3});
+  coll(sel.kind).push(o); sel = it; draw();
+};
+function addWifi(kind) {
+  if (kind === 'router' && data.wifi.routers.length) { sel = {kind, o: data.wifi.routers[0]}; draw(); status('There is already a router; drag it.', 'warn'); return; }
+  snapshot();
+  const [W, H] = data.size, list_ = coll(kind), n = list_.length + 1;
+  const base = {x: round(W / 2), y: round(H / 2)};
+  const o = kind === 'socket' ? {name: `socket${n}`, ...base}
+        : kind === 'router' ? {name: 'router', ...base}
+        : {name: `node_${String.fromCharCode(64 + (n > 26 ? 26 : n))}${n > 26 ? n : ''}`, ...base, mmwave: false, tx: false};
+  list_.push(o); sel = {kind, o}; draw();
+}
+function add(kind) {
+  snapshot();
+  const [W, H] = data.size, n = items().length + 1;
+  const o = kind === 'door' ? {name: `door${n}`, x0: W / 2 - .45, y0: H / 2 - .03, x1: W / 2 + .45, y1: H / 2 + .03}
+        : kind === 'cyl' ? {name: `round${n}`, x: W / 2, y: H / 2, r: 0.25, h: 0.8, rgb: [.5, .5, .5]}
+        : kind === 'rug' ? {name: `rug${n}`, x0: W / 2 - .6, y0: H / 2 - .4, x1: W / 2 + .6, y1: H / 2 + .4, rgb: [.6, .6, .7]}
+        : {name: `box${n}`, x0: W / 2 - .3, y0: H / 2 - .3, x1: W / 2 + .3, y1: H / 2 + .3, h: 0.8, rgb: [.6, .55, .5]};
+  data.furniture[KIND_KEY[kind]].push(o); sel = {kind, o}; draw();
+}
+$('add-socket').onclick = () => addWifi('socket'); $('add-node').onclick = () => addWifi('node'); $('add-router').onclick = () => addWifi('router');
+$('add-door').onclick = () => add('door'); $('add-box').onclick = () => add('box'); $('add-cyl').onclick = () => add('cyl'); $('add-rug').onclick = () => add('rug');
+function undo() {
+  if (!history.length) return;
+  const h = JSON.parse(history.pop()); data.furniture = h.f; data.wifi = h.w; sel = null; dirty = true; changedAt = Date.now(); draw();
+}
+$('undo').onclick = undo;
+addEventListener('keydown', e => {
+  if (e.target.closest('input')) return;
+  if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); undo(); }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && sel) { e.preventDefault(); $('del').onclick(); }
+  if (sel && e.key.startsWith('Arrow')) {        // nudge 5 cm
+    e.preventDefault(); snapshot(); const g = geom(sel), s = 0.05;
+    setGeom(sel, {...g, x: g.x + (e.key === 'ArrowRight' ? s : e.key === 'ArrowLeft' ? -s : 0), y: g.y + (e.key === 'ArrowUp' ? s : e.key === 'ArrowDown' ? -s : 0)}); draw();
+  }
+});
+$('showplan').onchange = draw; $('showlinks').onchange = draw;
+for (const id of ['cov-mm', 'cov-wifi', 'cov-blind']) $(id).onchange = draw;
+$('save').onclick = async () => {
+  $('save').disabled = true; status('Saving and rebuilding the simulator…'); dirty = false;
+  try {
+    const r = await fetch('/sim/furniture', {method: 'POST', body: JSON.stringify(data.furniture)});
+    const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+    fixNames(j.furniture); await saveWifi(); $('saved').textContent = `saved ${j.saved_at}`; status('Saved and rebuilt. The simulator uses it from its next start.', 'ok'); draw(); loadVersions(); if (view === '3d') build3d();
+  } catch (e) { status('Not saved: ' + e.message, 'warn'); }
+  $('save').disabled = false;
+};
+addEventListener('pagehide', () => { if (dirty) { navigator.sendBeacon('/sim/autosave', JSON.stringify(data.furniture)); navigator.sendBeacon('/sim/wifi', JSON.stringify(data.wifi)); } });
+addEventListener('resize', () => view === '2d' ? draw() : resize3d());
+
+// ---- 3D view (three.js) ----
+let THREE, renderer, scene, camera, controls;
+async function build3d() {
+  if (!THREE) {
+    THREE = await import('three'); const {OrbitControls} = await import('three/addons/controls/OrbitControls.js');
+    renderer = new THREE.WebGLRenderer({canvas: $('three'), antialias: true}); renderer.setPixelRatio(devicePixelRatio);
+    camera = new THREE.PerspectiveCamera(45, 1, 0.05, 100); camera.up.set(0, 0, 1);
+    controls = new OrbitControls(camera, $('three'));
+    const [W, H] = data.size; camera.position.set(W / 2, -H * 0.55, 9.5); controls.target.set(W / 2, H / 2, 0);
+    renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+  }
+  scene = new THREE.Scene(); scene.background = new THREE.Color('#0b0f15');
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x666655, 1.1));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.8); sun.position.set(3, -2, 8); scene.add(sun);
+  const box = (x0, y0, x1, y1, h, c, z0 = 0, op = 1) => { const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, h), new THREE.MeshLambertMaterial({color: c, transparent: op < 1, opacity: op})); m.position.set((x0 + x1) / 2, (y0 + y1) / 2, z0 + h / 2); scene.add(m); return m; };
+  const [W, H] = data.size; box(0, 0, W, H, 0.01, 0xa8916f, -0.01);
+  for (const c of data.furniture.carpet || []) box(c.x0, c.y0, c.x1, c.y1, 0.005, 0xb9b0a3);
+  for (const r of data.furniture.rugs) box(r.x0, r.y0, r.x1, r.y1, 0.008, new THREE.Color(...r.rgb));
+  for (const w of data.walls) {
+    if (w.kind === 'blinds') { for (let x = w.x0; x < w.x1; x += 0.09) box(x, w.y0, Math.min(x + 0.07, w.x1), w.y1, 2.2, 0xf2f2ee); }
+    else if (w.kind === 'wall') box(w.x0, w.y0, w.x1, w.y1, 2.4, 0xe9e4da, 0, 0.55);
+  }
+  for (const b of data.furniture.boxes) box(b.x0, b.y0, b.x1, b.y1, b.h, new THREE.Color(...b.rgb));
+  for (const p of data.wifi.sockets) box(p.x - .04, p.y - .04, p.x + .04, p.y + .04, .08, 0xfacc15, 0.3);
+  for (const p of data.wifi.routers) box(p.x - .08, p.y - .08, p.x + .08, p.y + .08, .15, 0xa855f7, 1.0);
+  for (const p of data.wifi.nodes) box(p.x - .06, p.y - .06, p.x + .06, p.y + .06, .12, p.mmwave ? 0x22d3ee : 0x3b82f6, 1.3);
+  for (const b of data.furniture.barriers) box(b.x0, b.y0, b.x1, b.y1, 1.0, 0xef4444, 0, 0.35);
+  for (const c of data.furniture.cylinders) { const m = new THREE.Mesh(new THREE.CylinderGeometry(c.r, c.r, c.h, 24), new THREE.MeshLambertMaterial({color: new THREE.Color(...c.rgb)})); m.rotation.x = Math.PI / 2; m.position.set(c.x, c.y, c.h / 2); scene.add(m); }
+  resize3d();
+}
+function resize3d() { if (!renderer) return; const r = $('stage').getBoundingClientRect(); renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); }
+function show(v) {
+  view = v; $('v2d').classList.toggle('on', v === '2d'); $('v3d').classList.toggle('on', v === '3d');
+  $('plan').style.display = v === '2d' ? 'block' : 'none'; $('three').style.display = v === '3d' ? 'block' : 'none';
+  if (v === '3d') build3d().catch(e => status('3D view needs the internet for three.js: ' + e.message, 'warn')); else draw();
+}
+$('v2d').onclick = () => show('2d'); $('v3d').onclick = () => show('3d');
+
+(async () => {
+  try { const r = await fetch('/sim/data', {cache: 'no-store'}); data = await r.json(); if (!r.ok) throw new Error(data.error);
+        for (const k of ['boxes', 'cylinders', 'rugs', 'barriers']) data.furniture[k] = data.furniture[k] || [];
+        data.wifi = data.wifi || {}; for (const k of Object.values(WIFI_KEY)) data.wifi[k] = data.wifi[k] || [];
+        draw(); loadVersions(); $('saved').textContent = 'saved';
+        status(`${furnCount()} pieces · apartment ${data.size.map(v => v.toFixed(1)).join(' × ')} m`); }
+  catch (e) { status('No sim apartment yet: ' + e.message, 'warn'); }
+})();
+</script>
+</body></html>

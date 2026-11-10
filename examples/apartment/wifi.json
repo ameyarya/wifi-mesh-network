@@ -1,0 +1,46 @@
+{
+ "note": "Example Wi-Fi layout (invented).",
+ "sockets": [
+  {
+   "name": "socket1",
+   "x": 0.15,
+   "y": 3.7
+  },
+  {
+   "name": "socket2",
+   "x": 2.9,
+   "y": 0.3
+  },
+  {
+   "name": "socket3",
+   "x": 5.85,
+   "y": 3.7
+  }
+ ],
+ "routers": [],
+ "nodes": [
+  {
+   "name": "node_A",
+   "x": 0.15,
+   "y": 3.7,
+   "mmwave": true,
+   "tx": false,
+   "aim": 315
+  },
+  {
+   "name": "node_B",
+   "x": 2.9,
+   "y": 0.3,
+   "mmwave": false,
+   "tx": true
+  },
+  {
+   "name": "node_C",
+   "x": 5.85,
+   "y": 3.7,
+   "mmwave": true,
+   "tx": false,
+   "aim": 225
+  }
+ ]
+}
