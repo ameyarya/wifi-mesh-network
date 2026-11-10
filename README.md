@@ -10,10 +10,10 @@ Python 3.9+, no dependencies.
 
 ```sh
 python3 editor/sim_editor.py                       # your own layout in sim/apartment if you have one, else the example
-python3 editor/sim_editor.py --dir examples/apartment --port 8010
+python3 editor/sim_editor.py --dir examples/apartment --port 8020
 ```
 
-Open http://localhost:8010/. The server listens on 127.0.0.1 only.
+Open http://localhost:8020/. The server listens on 127.0.0.1 only.
 
 ## What the editor does
 

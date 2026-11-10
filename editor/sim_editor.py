@@ -2,9 +2,9 @@
 """Standalone server for the apartment / Wi-Fi sensing editor (editor/sim.html).
 
     python3 editor/sim_editor.py                      # your layout in sim/apartment (local, gitignored), else the example
-    python3 editor/sim_editor.py --dir examples/apartment --port 8010
+    python3 editor/sim_editor.py --dir examples/apartment --port 8020
 
-Open http://localhost:8010/ . Layout files live in --dir:
+Open http://localhost:8020/ . Layout files live in --dir:
   apartment.json   size and walls (written by sim/apartment/build_apartment.py from a floor plan, or by hand)
   furniture.json   boxes, round things, rugs, carpet, virtual doors (edited in the page)
   wifi.json        sockets, router, ESP32 nodes (edited in the page)
@@ -207,7 +207,7 @@ def main():
     global SIM_DIR
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--dir', help='folder with apartment.json (default: sim/apartment if it has one, else examples/apartment)')
-    parser.add_argument('--port', type=int, default=8010)
+    parser.add_argument('--port', type=int, default=8020)
     args = parser.parse_args()
     SIM_DIR = Path(args.dir).resolve() if args.dir else (SIM_DIR if (SIM_DIR / 'apartment.json').exists() else REPO / 'examples/apartment')
     server = ThreadingHTTPServer(('127.0.0.1', args.port), Handler)
